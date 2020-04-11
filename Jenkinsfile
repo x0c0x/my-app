@@ -9,6 +9,13 @@ node{
         sh "${mvnCMD} clean package"
         }
         
+	stage('SonarQube Analysis') {
+        def mvnHome =  tool name: 'apache-maven-3.6.1', type: 'maven'
+        withSonarQubeEnv('sonar7') { 
+          sh "${mvnHome}/bin/mvn sonar:sonar"
+        	}
+   	}	
+	
         stage ('Testing Stage'){
         def mvnHome = tool name: 'apache-maven-3.6.1', type: 'maven'
         def mvnCMD = "${mvnHome}/bin/mvn"
