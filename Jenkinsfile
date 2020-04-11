@@ -1,52 +1,41 @@
+node{
+        stage('SCM Checkout'){
+        git credentialsId: 'git-creds', url: 'https://github.com/x0c0x/my-app.git'    
+        }
+        
+        stage ('Build mvn Packages'){
+        def mvnHome = tool name: 'apache-maven-3.6.1', type: 'maven'
+        def mvnCMD = "${mvnHome}/bin/mvn"
+        sh "${mvnCMD} clean package"
+        }
+        
+        stage ('Testing Stage'){
+        def mvnHome = tool name: 'apache-maven-3.6.1', type: 'maven'
+        def mvnCMD = "${mvnHome}/bin/mvn"
+        sh "${mvnCMD} test"
+        }
+        
+        stage('Build Docker Image'){
+            sh 'docker build -t pannly/my-app:2.0.0 .'
+        }
+ 
+        stage('Remove Previous Container'){
+        	try{
+        	    sh 'docker rm -f my-app'
+        	}catch(error){
+		//  do nothing if there is an exception
+	        }
+        }
+        
+        stage('Run Docker Container'){
+            sh 'docker run -p 8888:8080 -d --name my-app pannly/my-app:2.0.0'
+        }
 
-node {
-   // This is to demo github action	
-   def sonarUrl = 'sonar.host.url=http://172.31.30.136:9000'
-   def mvn = tool (name: 'maven3', type: 'maven') + '/bin/mvn'
-   stage('SCM Checkout'){
-    // Clone repo
-	git branch: 'master', 
-	credentialsId: 'github', 
-	url: 'https://github.com/javahometech/myweb'
-   
-   }
-   
-   stage('Sonar Publish'){
-	   withCredentials([string(credentialsId: 'sonarqube', variable: 'sonarToken')]) {
-        def sonarToken = "sonar.login=${sonarToken}"
-        sh "${mvn} sonar:sonar -D${sonarUrl}  -D${sonarToken}"
-	 }
-      
-   }
-   
-	
-   stage('Mvn Package'){
-	   // Build using maven
-	   
-	   sh "${mvn} clean package deploy"
-   }
-   
-   stage('deploy-dev'){
-       def tomcatDevIp = '172.31.28.172'
-	   def tomcatHome = '/opt/tomcat8/'
-	   def webApps = tomcatHome+'webapps/'
-	   def tomcatStart = "${tomcatHome}bin/startup.sh"
-	   def tomcatStop = "${tomcatHome}bin/shutdown.sh"
-	   
-	   sshagent (credentials: ['tomcat-dev']) {
-	      sh "scp -o StrictHostKeyChecking=no target/myweb*.war ec2-user@${tomcatDevIp}:${webApps}myweb.war"
-          sh "ssh ec2-user@${tomcatDevIp} ${tomcatStop}"
-		  sh "ssh ec2-user@${tomcatDevIp} ${tomcatStart}"
-       }
-   }
-   stage('Email Notification'){
-		mail bcc: '', body: """Hi Team, You build successfully deployed
-		                       Job URL : ${env.JOB_URL}
-							   Job Name: ${env.JOB_NAME}
+        stage('Push Docker Image'){
+        withCredentials([string(credentialsId: 'dockerp', variable: 'dockerp')]) {
+          sh "docker login -u pannly -p ${dockerp}"
+        }
+          sh 'docker push pannly/my-app:2.0.0'
+     }
 
-Thanks,
-DevOps Team""", cc: '', from: '', replyTo: '', subject: "${env.JOB_NAME} Success", to: 'hari.kammana@gmail.com'
-   
-   }
-}
-
+    }
