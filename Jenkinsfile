@@ -26,7 +26,7 @@ node{
             sh 'docker build -t pannly/my-app:2.0.0 .'
 
 // Send slack message		
-	currentBuild.result = "Successed"
+	currentBuild.result = 'SUCCESS'
 	message = """
         *Jenkins Build*
         Job name: `${env.JOB_NAME}`
@@ -59,7 +59,7 @@ node{
 	  sh 'docker push pannly/my-app:2.0.0'
         }
           
-//	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
+	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
      }
 
     }
