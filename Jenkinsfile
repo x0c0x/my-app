@@ -27,7 +27,7 @@ node{
         stage('Build Docker Image'){
             slackSend channel: '#jenkins-build', color: 'good', message: "Job -  *${env.JOB_NAME}*, Docker image is building....."
 	    sh 'docker build -t pannly/my-app:2.0.0 .'
-
+	}
 // Send slack message		
 /*	
 	message = """
