@@ -40,10 +40,10 @@ node{
         stage('Remove Previous Container'){
         	try{
         	    sh 'docker rm -f my-app'
-		slackSend color: 'good', message: "Job -  ${env.JOB_NAME}, Removed my-app container !!"
+		slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Removed my-app container !!"
         	}catch(error){
 		//  do nothing if there is an exception
-		slackSend color: 'danger', message: "Job -  ${env.JOB_NAME}, No running my-app container !!"
+		slackSend channel: '#jenkins-build', color: 'danger', message: "Job -  ${env.JOB_NAME}, No running my-app container !!"
 	        }
         }
         
@@ -58,7 +58,7 @@ node{
           sh "docker login -u pannly -p ${dockerp}"
         }
           sh 'docker push pannly/my-app:2.0.0'
-	  slackSend color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
+	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
      }
 
     }
