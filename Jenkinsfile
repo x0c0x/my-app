@@ -48,8 +48,9 @@ node{
         }
         
         stage('Run Docker Container'){
-            sh 'docker run -p 8888:8080 --rm --name my-app pannly/my-app:2.0.0'
+            sh 'docker run -p 8888:8080 -d --name my-app pannly/my-app:2.0.0'
 	    sh 'docker stop my-app'
+	    sh 'docker rm my-app'
         }
 
         stage('Push Docker Image'){
