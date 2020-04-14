@@ -36,7 +36,7 @@ node{
     """.stripIndent()
 	slackSend(color: 'good', message: message)
         }
-/*
+
         stage('Remove Previous Container'){
         	try{
         	    sh 'docker rm -f my-app'
@@ -46,7 +46,7 @@ node{
 		slackSend channel: '#jenkins-build', color: 'danger', message: "Job -  ${env.JOB_NAME}, No running my-app container !!"
 	        }
         }
- */       
+      
         stage('Run Docker Container'){
             sh 'docker run -p 8888:8080 -d --name my-app pannly/my-app:2.0.0'
 	    sh 'docker stop my-app'
@@ -54,11 +54,12 @@ node{
         }
 
         stage('Push Docker Image'){
-        withCredentials([string(credentialsId: 'dockerp', variable: 'dockerp')]) {
+          withCredentials([string(credentialsId: 'dockerp', variable: 'dockerp')]) {
           sh "docker login -u pannly -p ${dockerp}"
+	  sh 'docker push pannly/my-app:2.0.0'
         }
-          sh 'docker push pannly/my-app:2.0.0'
-	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
+          
+//	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
      }
 
     }
