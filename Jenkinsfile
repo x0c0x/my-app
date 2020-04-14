@@ -6,7 +6,9 @@ node{
         stage ('Build mvn Packages'){
         def mvnHome = tool name: 'apache-maven-3.6.1', type: 'maven'
         def mvnCMD = "${mvnHome}/bin/mvn"
-        sh "${mvnCMD} clean package"
+        slackSend channel: '#jenkins-build', color: 'good', message: "Job -  *${env.JOB_NAME}*, Build package is starting ....."
+	sh "${mvnCMD} clean package"
+	currentBuild.result = 'SUCCESS'
         }
         
 	stage('SonarQube Analysis') {
@@ -23,10 +25,11 @@ node{
         }
 */        
         stage('Build Docker Image'){
-            sh 'docker build -t pannly/my-app:2.0.0 .'
+            slackSend channel: '#jenkins-build', color: 'good', message: "Job -  *${env.JOB_NAME}*, Docker image is building....."
+	    sh 'docker build -t pannly/my-app:2.0.0 .'
 
 // Send slack message		
-	currentBuild.result = 'SUCCESS'
+/*	
 	message = """
         *Jenkins Build*
         Job name: `${env.JOB_NAME}`
@@ -46,18 +49,27 @@ node{
 		slackSend channel: '#jenkins-build', color: 'danger', message: "Job -  ${env.JOB_NAME}, No running my-app container !!"
 	        }
         }
-      
-        stage('Run Docker Container'){
+*/      
+        stage('Test Run Container'){
             sh 'docker run -p 8888:8080 -d --name my-app pannly/my-app:2.0.0'
 	    sh 'docker stop my-app'
 	    sh 'docker rm my-app'
         }
 
-        stage('Push Docker Image'){
+        stage('Push docker image to DockerHub '){
           withCredentials([string(credentialsId: 'dockerp', variable: 'dockerp')]) {
           sh "docker login -u pannly -p ${dockerp}"
 	  sh 'docker push pannly/my-app:2.0.0'
         }  
-	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
-     	}
+//	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
+//     	currentBuild.result = 'SUCCESS'
+	message = """
+        *Jenkins Build*
+        Job name: `${env.JOB_NAME}`
+        Build number: `#${env.BUILD_NUMBER}`
+        Build status: `${currentBuild.result}`
+        Build details: <${env.BUILD_URL}/console|See in web console>
+    """.stripIndent()
+	slackSend(color: 'good', message: message)
+	}
     }
