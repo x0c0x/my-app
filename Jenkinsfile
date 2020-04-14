@@ -11,7 +11,7 @@ node{
 	currentBuild.result = 'SUCCESS'
         }
         
-	stage('SonarQube Analysis') {
+	stage('SonarQube Code Analysis') {
         def mvnHome =  tool name: 'apache-maven-3.6.1', type: 'maven'
         withSonarQubeEnv('sonar7') { 
           sh "${mvnHome}/bin/mvn sonar:sonar"
@@ -56,7 +56,7 @@ node{
 	    sh 'docker rm my-app'
         }
 
-        stage('Push docker image to DockerHub '){
+        stage('Push image to DockerHub '){
           withCredentials([string(credentialsId: 'dockerp', variable: 'dockerp')]) {
           sh "docker login -u pannly -p ${dockerp}"
 	  sh 'docker push pannly/my-app:2.0.0'
