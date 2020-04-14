@@ -39,7 +39,7 @@ node{
     """.stripIndent()
 	slackSend(color: 'good', message: message)
         }
-
+//
         stage('Remove Previous Container'){
         	try{
         	    sh 'docker rm -f my-app'
