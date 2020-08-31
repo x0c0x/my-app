@@ -1,76 +1,83 @@
-node{
-        stage('SCM Checkout'){
-        git credentialsId: 'git-creds', url: 'https://github.com/x0c0x/my-app.git'    
-        }
-        
-        stage ('Build mvn Packages'){
-        def mvnHome = tool name: 'apache-maven-3.6.1', type: 'maven'
-        def mvnCMD = "${mvnHome}/bin/mvn"
-//        slackSend channel: '#jenkins-build', color: 'good', message: "Job -  *${env.JOB_NAME}*, Build package is starting ....."
-	sh "${mvnCMD} clean package"
-	currentBuild.result = 'SUCCESS'
-        }
-        
-	stage('SonarQube Code Analysis') {
-        def mvnHome =  tool name: 'apache-maven-3.6.1', type: 'maven'
-        withSonarQubeEnv('sonar7') { 
-          sh "${mvnHome}/bin/mvn sonar:sonar"
-        	}
-   	}	
-/**	
-        stage ('Testing Stage'){
-        def mvnHome = tool name: 'apache-maven-3.6.1', type: 'maven'
-        def mvnCMD = "${mvnHome}/bin/mvn"
-        sh "${mvnCMD} test"
-        }
-*/        
-        stage('Build Docker Image'){
-//            slackSend channel: '#jenkins-build', color: 'good', message: "Job -  *${env.JOB_NAME}*, Docker image is building....."
-	    sh 'docker build -t pannly/my-app:2.0.0 .'
-	}
-// Send slack message		
-/*	
-	message = """
-        *Jenkins Build*
-        Job name: `${env.JOB_NAME}`
-        Build number: `#${env.BUILD_NUMBER}`
-        Build status: `${currentBuild.result}`
-        Build details: <${env.BUILD_URL}/console|See in web console>
-    """.stripIndent()
-	slackSend(color: 'good', message: message)
-        }
-//
-        stage('Remove Previous Container'){
-        	try{
-        	    sh 'docker rm -f my-app'
-		slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Removed my-app container !!"
-        	}catch(error){
-		//  do nothing if there is an exception
-		slackSend channel: '#jenkins-build', color: 'danger', message: "Job -  ${env.JOB_NAME}, No running my-app container !!"
-	        }
-        }
-*/      
-        stage('Test Run Container'){
-            sh 'docker run -p 8888:8080 -d --name my-app pannly/my-app:2.0.0'
-	    sh 'docker stop my-app'
-	    sh 'docker rm my-app'
-        }
+pipeline {
+  agent any
+  environment {
+        hostssh='ssh -l root 172.17.0.1'
+  }
+  parameters{
+    string(name: 'targetImage', defaultValue: 'centos:7', description: 'Please enter the image you wish to scan' )
+  }
+  stages {        
+    stage('Prep Environment') {
+      steps {
+        sh '''
+echo "starting scan services"
 
-        stage('Push image to DockerHub '){
-          withCredentials([string(credentialsId: 'dockerp', variable: 'dockerp')]) {
-          sh "docker login -u pannly -p ${dockerp}"
-	  sh 'docker push pannly/my-app:2.0.0'
-        }  
-//	  slackSend channel: '#jenkins-build', color: 'good', message: "Job -  ${env.JOB_NAME}, Completed successfully Build URL is ${env.BUILD_URL}"	
-//     	currentBuild.result = 'SUCCESS'
-	message = """
-        *Jenkins Build*
-        Job name: `${env.JOB_NAME}`
-        Build number: `#${env.BUILD_NUMBER}`
-        Build status: `${currentBuild.result}`
-        Build details: <${env.BUILD_URL}/console|See in web console>
-    """.stripIndent()
-	slackSend(color: 'good', message: message)
-	}
+$hostssh docker network create scanning 
+$hostssh docker run -p 5432:5432 -d --net=scanning --name db arminc/clair-db:latest
+echo "Snoozing for DB to start" && sleep 30
+$hostssh docker run -p 6060:6060 -d --net=scanning --link db:postgres --name clair arminc/clair-local-scan:v2.0.1
+
+echo "Snooze and check they are up"
+sleep 8
+$hostssh docker ps
+'''
+      }
     }
-//
+    stage('Run Scanner') {
+      steps {
+        sh '''
+$hostssh docker pull $targetImage
+echo "Run a scan"
+$hostssh mkdir /tmp/$BUILD_TAG || echo "Folder was already present"
+$hostssh chmod 777 /tmp/$BUILD_TAG
+$hostssh docker run --net=scanning --rm --name=scanner --link=clair:clair -v "/tmp/$BUILD_TAG/:/var/log/:z" -v \'/var/run/docker.sock:/var/run/docker.sock:z\' objectiflibre/clair-scanner --clair="http://clair:6060" --ip="scanner" -r "var/log/$BUILD_NUMBER.json" -t Medium $targetImage || echo "Warning Error returned in results remove this echo if you really want to stop the job here"
+'''
+      }
+    }
+    stage('Report Collection') {
+      steps {
+        sh '''
+echo "We should gather the reports"
+mkdir /tmp/$BUILD_TAG || echo "Folder was already present"
+scp root@172.17.0.1:/tmp/$BUILD_TAG/$BUILD_NUMBER.json $WORKSPACE/
+# /var/lib/jenkins/jobs/Jenkins-BlueOcean-Demo-Scan/branches/dev/workspace
+#/tmp/$BUILD_TAG/
+#pwd
+#env
+'''
+archiveArtifacts '$BUILD_NUMBER.json'
+      }
+    }
+  }
+  post {
+    always {
+        echo 'It was inevitable'
+      sh ''' 
+        echo "Begin Cleanup"
+        $hostssh docker container stop db || echo "."
+        $hostssh docker container stop clair || echo "."
+        $hostssh docker container rm db || echo "."
+        $hostssh docker container rm clair || echo "."
+        $hostssh docker network rm scanning || echo "."
+        $hostssh docker container prune -f || echo "."
+        $hostssh docker image prune -f || echo "."
+        $hostssh rm -rf /tmp/$BUILD_TAG || echo "."
+        rm -rf /tmp/$BUILD_TAG || echo "."
+        echo "Cleanup finished"
+      '''
+        // deleteDir() /* clean up our workspace */
+    }
+    success {
+        echo 'I succeeeded!'
+    }
+    unstable {
+        echo 'I am unstable :/'
+    }
+    changed {
+        echo 'Things were different before...'
+    }
+    failure {
+        echo 'It did not end well'
+    }
+  }
+}
